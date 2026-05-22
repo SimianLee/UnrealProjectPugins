@@ -1,0 +1,24 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "1.0",
+	"FriendlyName": "SvgPulgin",
+	"Description": "",
+	"Category": "Other",
+	"CreatedBy": "Tom",
+	"CreatedByURL": "",
+	"DocsURL": "",
+	"MarketplaceURL": "",
+	"SupportURL": "",
+	"CanContainContent": true,
+	"IsBetaVersion": false,
+	"IsExperimentalVersion": false,
+	"Installed": false,
+	"Modules": [
+		{
+			"Name": "SvgPulgin",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		}
+	]
+}
