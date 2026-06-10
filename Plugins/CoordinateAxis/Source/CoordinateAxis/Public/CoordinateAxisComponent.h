@@ -1,48 +1,45 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Copyright Epic Games, Inc. All Rights Reserved.
 
 #pragma once
 
 #include "CoreMinimal.h"
 #include "HitProxies.h"
+#include "DynamicMeshBuilder.h"
 #include "Components/PrimitiveComponent.h"
-#include "Blueprint/UserWidget.h"
 #include "Widgets/SCompoundWidget.h"
 #include "Widgets/Layout/SConstraintCanvas.h"
 #include "CoordinateAxisComponent.generated.h"
 
-USTRUCT()
-struct AIRCITYPLUGIN_API FDragMovementInfo
-{
-	GENERATED_BODY()
+// ============================================================
+// 前向声明（全局作用域，供命名空间函数声明使用）
+// ============================================================
+class UCoordinateAxisComponent;
+class FSceneView;
+class FPrimitiveDrawInterface;
+class FMeshElementCollector;
+struct FTriMeshCollisionData;
 
-public:
-
-	int32 CoordinateIndex = 0;
-
-	FPlane MovementPlane;
-
-	FVector MovementDirVector;
-
-	FVector DragStartPlanePosition;
-
-};
+// ============================================================
+// 公共枚举定义
+// ============================================================
 
 UENUM()
 enum EAxisType
 {
-	EAT_None = 0,
-	EAT_X = 1,
-	EAT_Y = 2,
-	EAT_Z = 4,
+	EAT_None   = 0,
+	EAT_X      = 1,
+	EAT_Y      = 2,
+	EAT_Z      = 4,
 	EAT_Screen = 8,
 
-	EAT_XY = EAT_X | EAT_Y,
-	EAT_XZ = EAT_X | EAT_Z,
-	EAT_YZ = EAT_Y | EAT_Z,
-	EAT_XYZ = EAT_X | EAT_Y | EAT_Z,
-	EAT_All = EAT_XYZ | EAT_Screen,
+	EAT_XY     = EAT_X | EAT_Y,
+	EAT_XZ     = EAT_X | EAT_Z,
+	EAT_YZ     = EAT_Y | EAT_Z,
+	EAT_XYZ    = EAT_X | EAT_Y | EAT_Z,
+	EAT_All    = EAT_XYZ | EAT_Screen,
 };
 
+/** 坐标轴功能类型：平移 / 旋转 / 缩放 */
 UENUM()
 enum ECoorAxisRenderType
 {
@@ -52,374 +49,390 @@ enum ECoorAxisRenderType
 	CART_Scale,
 };
 
+/** 坐标轴显示模式 */
 UENUM()
 enum ECoordinateAxisMode
 {
-	CAM_Normal,		// 正常
-	CAM_Mix,		// 混合
+	CAM_Normal,  // 正常（三轴各自可见）
+	CAM_Mix,     // 混合（平移+旋转Z）
 };
 
+// ============================================================
+// 拖拽平面信息（供 Movement 使用）
+// ============================================================
+
+struct FDragMovementInfo
+{
+	int32   CoordinateIndex = 0;
+	FPlane  MovementPlane;
+	FVector MovementDirVector;
+	FVector DragStartPlanePosition;
+};
+
+struct FAbsoluteMovementParams
+{
+	FVector PlaneNormal;
+	FVector NormalToRemove;
+	FVector Position;
+	FVector XAxis, YAxis, ZAxis;
+	bool    bMovementLockedToCamera = false;
+	FVector PixelDir;
+	FVector CameraDir;
+	FVector EyePos;
+	bool    bPositionSnapping = false;
+};
+
+// ============================================================
+// CoordinateAxisRender 命名空间 — 函数声明
+// ============================================================
+namespace CoordinateAxisRenderFuncs
+{
+	void RenderTranslation(UCoordinateAxisComponent* InComp, const FSceneView* InView, FPrimitiveDrawInterface* InPDI, FMeshElementCollector& InCollector, const FMatrix& InMatrix);
+	void BuildTranslationCollision(UCoordinateAxisComponent* InComp, const FMatrix& InMatrix, FTriMeshCollisionData& CollisionData);
+
+	void RenderRotate(UCoordinateAxisComponent* InComp, const FSceneView* InView, FPrimitiveDrawInterface* InPDI, FMeshElementCollector& InCollector, const FMatrix& InMatrix);
+	void BuildRotateCollision(UCoordinateAxisComponent* InComp, const FMatrix& InMatrix, FTriMeshCollisionData& CollisionData);
+
+	void RenderScale(UCoordinateAxisComponent* InComp, const FSceneView* InView, FPrimitiveDrawInterface* InPDI, FMeshElementCollector& InCollector, const FMatrix& InMatrix);
+	void BuildScaleCollision(UCoordinateAxisComponent* InComp, const FMatrix& InMatrix, FTriMeshCollisionData& CollisionData);
+
+	// 基础几何体构建（共用）
+	void BuildTranslationAxisVerts(TArray<FDynamicMeshVertex>& OutVerts, TArray<uint32>& OutIndices, float CylinderRadius = 1.2f);
+	void BuildCylinderVerts(const FVector& Base, const FVector& XAxis, const FVector& YAxis, const FVector& ZAxis, float Radius, float HalfHeight, uint32 Sides, TArray<FDynamicMeshVertex>& OutVerts, TArray<uint32>& OutIndices);
+	void BuildConeVerts(float Angle1, float Angle2, float Scale, FVector Offset, uint32 NumSides, TArray<FDynamicMeshVertex>& OutVerts, TArray<uint32>& OutIndices);
+	FVector CalcConeVert(float Angle1, float Angle2, float AzimuthAngle);
+	void BuildSphereVerts(TArray<FDynamicMeshVertex>& OutVerts, TArray<uint32>& OutIndices);
+	void BuildCornerVerts(float RenderBoxScale, TArray<FDynamicMeshVertex>& OutVerts, TArray<uint32>& OutIndices);
+	void BuildSquareVerts(TArray<FDynamicMeshVertex>& OutVerts, TArray<uint32>& OutIndices);
+	void BuildScaleAxisVerts(TArray<FDynamicMeshVertex>& OutVerts, TArray<uint32>& OutIndices);
+	void BuildCubeVerts(float Scale, FVector Offset, TArray<FDynamicMeshVertex>& OutVerts, TArray<uint32>& OutIndices);
+	void BuildTriangleVerts(TArray<FDynamicMeshVertex>& OutVerts, TArray<uint32>& OutIndices);
+	void BuildThickArcVerts(TArray<FDynamicMeshVertex>& OutVerts, TArray<uint32>& OutIndices, const FVector& Axis0, const FVector& Axis1, float StartAngle, float EndAngle, float OuterRadius, float InnerRadius, const FColor& Color);
+	void BuildStartStopMarkerVerts(TArray<FDynamicMeshVertex>& OutVerts, TArray<uint32>& OutIndices, const FVector& Axis0, const FVector& Axis1, float Angle, const FColor& Color);
+	void BuildSnapMarkerVerts(TArray<FDynamicMeshVertex>& OutVerts, TArray<uint32>& OutIndices, const FVector& Axis0, const FVector& Axis1, float WidthPercent, float PercentSize, const FColor& Color);
+}
+
+// ============================================================
+// CoordinateAxisMovement 命名空间 — 函数声明
+// ============================================================
+namespace CoordinateAxisMovementFuncs
+{
+	void ConvertMouseMovementToAxisMovement(UCoordinateAxisComponent* InComp, const FSceneView* InView, const FVector2D& InMousePos, FVector& InOutDelta, FVector& OutDrag, FRotator& OutRotation, FVector& OutScale);
+	void PrepareStartDragMovement(UCoordinateAxisComponent* InComp, const FVector2D& InCurrentPos);
+	void CalcTranslationDragDelta(UCoordinateAxisComponent* InComp, const FVector2D& InCurrentPos, FVector& OutMoveDelta);
+	void ResetMovementState(UCoordinateAxisComponent* InComp);
+
+	FDragMovementInfo GetStartDragMovement(UCoordinateAxisComponent* InComp, int32 InCoordinateIndex, const FVector2D& InCurrentPos);
+	FVector GetDragLocation(UCoordinateAxisComponent* InComp, const FDragMovementInfo& Info, const FVector2D& InCurrentPos);
+}
+
+// ============================================================
+// UCoordinateAxisComponent — 完整坐标轴功能组件
+// ============================================================
+
+/**
+ * UCoordinateAxisComponent
+ *
+ * 完整的坐标轴功能组件。通过 SetAxisType() 切换为 Translation / Rotation / Scale 三种形态。
+ * 绘制逻辑委托给 CoordinateAxisRender.cpp，拖拽逻辑委托给 CoordinateAxisMovement.cpp。
+ *
+ * 外部使用者通过以下接口控制：
+ *   - SetRenderComponent()   控制可见性
+ *   - StartDragging()        开始拖拽
+ *   - StopDragging()         停止拖拽
+ *   - SetAxisType()          设置坐标轴类型（Translation/Rotation/Scale）
+ *   - SetCoorAxisMode()      设置显示模式（Normal/Mix）
+ *   - SetComponentMaterial() 设置材质
+ *
+ * 拖拽回调：
+ *   - OnTranslationOffsetDelegate  平移偏移
+ *   - OnRotationOffsetDelegate     旋转偏移
+ *   - OnScaleOffsetDelegate        缩放偏移
+ */
 UCLASS()
-class AIRCITYPLUGIN_API UCoordinateAxisComponent : public UPrimitiveComponent, public IInterface_CollisionDataProvider
+class COORDINATEAXIS_API UCoordinateAxisComponent
+	: public UPrimitiveComponent
+	, public IInterface_CollisionDataProvider
 {
 	GENERATED_BODY()
 
-public:	/* 外部调用函数 */
+	// --------------------------------------------------------
+	// 构造 / 生命周期
+	// --------------------------------------------------------
+public:
+	UCoordinateAxisComponent();
+	~UCoordinateAxisComponent();
 
-	// 开始拖拽
+protected:
+	virtual void BeginPlay() override;
+	virtual void OnComponentDestroyed(bool bDestroyingHierarchy) override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
+
+	// --------------------------------------------------------
+	// 外部调用接口
+	// --------------------------------------------------------
+public:
+
+	/** 开始拖拽（需先有 FocusAxis） */
 	UFUNCTION()
-	virtual void StartDragging();
+	void StartDragging();
 
-	// 停止拖拽
+	/** 停止拖拽 */
 	UFUNCTION()
-	virtual void StopDragging();
+	void StopDragging();
 
-	// 是否拖拽
+	/** 是否正在拖拽 */
 	UFUNCTION()
-	bool bIsDragging();
+	bool IsDragging() const;
 
-	// 开始渲染
+	/** 设置可见性（false 时同时停止拖拽） */
 	UFUNCTION()
 	void SetRenderComponent(bool bIsRender);
 
-	// 是否渲染
+	/** 是否可见 */
 	UFUNCTION()
-	bool bIsRender() const;
+	bool IsRenderVisible() const;
 
-	EAxisType GetFocusAxis();
+	/** 获取当前高亮轴 */
+	EAxisType GetFocusAxis() const;
 
-	// 设置要渲染的轴
+	/** 设置要渲染的轴标志 */
 	void SetRenderCoordinateAxis(const EAxisType& InMode);
 
-	EAxisType GetRenderAxis();
+	/** 获取当前渲染轴标志 */
+	EAxisType GetRenderAxis() const;
 
+	/** 批量设置材质 */
 	UFUNCTION()
-	void SetComponentMaterial(UMaterialInstanceDynamic* InOrigin, UMaterialInstanceDynamic* InX, UMaterialInstanceDynamic* InY, UMaterialInstanceDynamic* InZ, UMaterialInstanceDynamic* InFocus, UMaterialInstanceDynamic* InPlane, UMaterialInstanceDynamic* InFocusPlane, UMaterialInterface* InArcPlane);
+	void SetComponentMaterial(
+		UMaterialInstanceDynamic* InOrigin,
+		UMaterialInstanceDynamic* InX,
+		UMaterialInstanceDynamic* InY,
+		UMaterialInstanceDynamic* InZ,
+		UMaterialInstanceDynamic* InFocus,
+		UMaterialInstanceDynamic* InPlane,
+		UMaterialInstanceDynamic* InFocusPlane,
+		UMaterialInterface*        InArcPlane);
 
+	/** 设置坐标轴显示模式 */
 	UFUNCTION()
-	void SetCoorAixsMode(ECoordinateAxisMode InMode);
+	void SetCoorAxisMode(ECoordinateAxisMode InMode);
+	ECoordinateAxisMode GetCoorAxisMode() const { return CoorAxisMode; }
 
-	ECoordinateAxisMode GetCoorAixsMode(){ return CoorAxisMode; };
+	/** 设置坐标轴功能类型（Translation / Rotation / Scale） */
+	void SetAxisType(ECoorAxisRenderType InType);
+	ECoorAxisRenderType GetAxisType() const { return CoorAxisType; }
 
+	/** 获取顶部 UI 吸附锚点（世界坐标） */
 	UFUNCTION()
-	FVector GetTopLocation();
+	FVector GetTopLocation() const;
 
-	float GetRenderScale();
+	/** 获取当前渲染缩放比例 */
+	float GetRenderScale() const;
 
-	ECoorAxisRenderType GetCoorAxisType() { return CoorAxisType; };
+	/** 获取相机到 Widget 的方向 */
+	FVector GetDirectionToWidget() const { return DirectionToWidget; }
 
-	FVector GetDirectionToWidget() { return DirectionToWidget; };
-
+	/** 触屏拖拽模式开关 */
 	void SetTouchDragging(bool bTouch);
 
-protected:
+	/** 手动触发 FocusAxis 更新（触屏时由外部调用） */
+	void UpdateFocusAxis();
 
-	// Sets default values for this component's properties
-	UCoordinateAxisComponent();
+	/** 获取坐标轴方向（旋转后） */
+	TArray<FVector> GetCoorAxisDirs() const;
 
-	~UCoordinateAxisComponent();
-
-	virtual void BeginPlay() override;
-
-	virtual void OnComponentDestroyed(bool bDestroyingHierarchy) override;
-
-	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
-
-	void TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction *ThisTickFunction) override;
-
-protected:
-
-	void InitParam();
-
-	// void InitMaterial();
-
-protected:/** PDI Render */
-
-	FPrimitiveSceneProxy* CreateSceneProxy() override;
-
-	FBoxSphereBounds CalcBounds(const FTransform& LocalToWorld) const override;
-
-	class UBodySetup* GetBodySetup() override;
-
-protected: /* Render */
-
-	virtual void Render(const FSceneView* InView, FPrimitiveDrawInterface* InPDI, FMeshElementCollector& InCollector);
-
+	// --------------------------------------------------------
+	// 拖拽回调 Delegate
+	// --------------------------------------------------------
 public:
 
-	// Render
+	DECLARE_DELEGATE_OneParam(FTranslationOffsetDelegate, const FVector&);
+	DECLARE_DELEGATE_OneParam(FRotationOffsetDelegate,    const FRotator&);
+	DECLARE_DELEGATE_OneParam(FScaleOffsetDelegate,       const FVector&);
+
+	FTranslationOffsetDelegate OnTranslationOffsetDelegate;
+	FTranslationOffsetDelegate OnTranslationFinalDelegate;
+	FRotationOffsetDelegate    OnRotationOffsetDelegate;
+	FScaleOffsetDelegate       OnScaleOffsetDelegate;
+
+	// --------------------------------------------------------
+	// 旋转专属
+	// --------------------------------------------------------
+public:
+
+	/** 当前累计旋转量（供圆弧可视化） */
+	float TotalDeltaRotation = 0.f;
+
+	/** 更新累计旋转量 */
+	void UpdateDeltaRotation();
+
+	// --------------------------------------------------------
+	// 旋转角度 HUD 弹窗
+	// --------------------------------------------------------
+public:
+	void CreateRotatePopupString();
+	void RemoveRotatePopupString();
+	void UpdateRotatePopupStringPos();
+
+	// --------------------------------------------------------
+	// 渲染相关公开数据
+	// --------------------------------------------------------
+public:
+
+	/** 当前帧渲染缩放（由 SceneProxy 在渲染线程写入） */
 	float RenderBoxScale = 1.f;
 
-	// Tick Component
+	/** Tick 端渲染缩放 */
 	float RenderScale = 1.f;
 
-protected:/** Render Collision */
+	// --------------------------------------------------------
+	// 材质
+	// --------------------------------------------------------
+public:
 
-	bool GetPhysicsTriMeshData(struct FTriMeshCollisionData* CollisionData, bool InUseAllTriData) override;
+	UPROPERTY()
+	UMaterialInstanceDynamic* AxisMaterialX      = nullptr;
+	UPROPERTY()
+	UMaterialInstanceDynamic* AxisMaterialY      = nullptr;
+	UPROPERTY()
+	UMaterialInstanceDynamic* AxisMaterialZ      = nullptr;
+	UPROPERTY()
+	UMaterialInstanceDynamic* PlaneMaterial      = nullptr;
+	UPROPERTY()
+	UMaterialInstanceDynamic* AxisOriginMaterial = nullptr;
+	UPROPERTY()
+	UMaterialInstanceDynamic* FocusAxisMaterial  = nullptr;
+	UPROPERTY()
+	UMaterialInstanceDynamic* FocusPlaneMaterial = nullptr;
+	UPROPERTY()
+	UMaterialInterface*        ArcPlaneMaterial   = nullptr;
 
-	bool ContainsPhysicsTriMeshData(bool InUseAllTriData) const override;
+	FLinearColor AxisColorX, AxisColorY, AxisColorZ;
+	FLinearColor PlaneColor, AxisOriginColor, FocusColor, FocusPlaneColor, LucencyColor;
 
-	void GetMeshId(FString& OutMeshId) override;
+	// --------------------------------------------------------
+	// FocusAxis / 碰撞检测
+	// --------------------------------------------------------
+public:
 
-	bool WantsNegXTriMesh() override;
+	int32     GetSelectFaceIndex() const;
+	EAxisType GetSelectedVertexAxis(int32 InFaceIndex) const;
 
-protected:/** Collision */
+	/** 碰撞三角面数计数器 */
+	int32 RenderAxisVertexNum    = 0;
+	int32 RenderDualAxisVertexNum = 0;
+	int32 RenderSceneVertexNum   = 0;
 
-	virtual void BuildCollision(FTriMeshCollisionData& InCollisionData);
+protected: /* PDI Render & Collision */
+
+	virtual FPrimitiveSceneProxy* CreateSceneProxy() override;
+	virtual FBoxSphereBounds CalcBounds(const FTransform& LocalToWorld) const override;
+	virtual class UBodySetup* GetBodySetup() override;
+
+	virtual bool GetPhysicsTriMeshData(struct FTriMeshCollisionData* CollisionData, bool InUseAllTriData) override;
+	virtual bool ContainsPhysicsTriMeshData(bool InUseAllTriData) const override;
+	virtual void GetMeshId(FString& OutMeshId) override;
+	virtual bool WantsNegXTriMesh() override;
 
 	void UpdateCollision();
-
-protected:
-
-	float HitDistance;
 
 	UPROPERTY()
 	class UBodySetup* VertexMeshBodySetup = nullptr;
 
-public:/* Focus */
+protected: /* Screen Widget Layer */
 
-	void UpdateFocusAxis();
-
-	int32 GetSelectFaceIndex() const;
-
-	EAxisType GetSelectedVertexAxis(int32 InFaceIndex) const;
-
-protected:
-
-	APlayerController* Controller;
-
-protected: /* Move */
-
-	virtual void CacluMouseDragOffset();
-
-	FVector2D GetMousePosition();
-
-	FVector2D GetTouchPosition();
-
-	void PrepareStartDragMovement();
-
-	virtual TArray<FVector> GetCoorAxisDirs();
-
-	FDragMovementInfo GetStartDragMovement(int32 InCoordinateIndex);
-
-	FVector GetDragLocation(const FDragMovementInfo& Info);
-
-protected:
-
-	FVector2D LastMousePos;
-
-	FVector2D CurrentPosition;
-
-	TArray<FDragMovementInfo> DragMovementInfos;
-
-	/* End Move */
-
-protected:
-
-	// 拖动
-	bool bDragging;
-
-	//
-	bool bTouchDragging = false;
-
-	// 渲染
-	bool bRender;
-
-	// 聚焦轴
-	EAxisType CoordinateFocusAxis;
-
-	// 渲染轴
-	EAxisType CoordinateRenderAxis;
-
-	// 渲染类型
-	ECoorAxisRenderType CoorAxisType;
-
-	ECoordinateAxisMode CoorAxisMode;
-
-	// 渲染轴面数
-	int32 RenderAxisVertexNum;
-
-	// 渲染拐角面数
-	int32 RnederDualAxisVertexNum;
-
-	// 渲染中心点面数
-	int32 RenderSceneVertexNum;
-
-protected:
-
-	// Color
-	FLinearColor AxisColorX, AxisColorY, AxisColorZ, PlaneClor, AxisOriginColor, FocusColor, FocusPlaneClor, LucencyColor;
-
-	// Material Instance
-	UPROPERTY()
-	UMaterialInstanceDynamic* AxisMaterialX = nullptr;
-
-	UPROPERTY()
-	UMaterialInstanceDynamic* AxisMaterialY = nullptr;
-
-	UPROPERTY()
-	UMaterialInstanceDynamic* AxisMaterialZ = nullptr;
-
-	UPROPERTY()
-	UMaterialInstanceDynamic* PlaneMaterial = nullptr;
-
-	UPROPERTY()
-	UMaterialInstanceDynamic* AxisOriginMaterial = nullptr;
-
-	UPROPERTY()
-	UMaterialInstanceDynamic* FocusAxisMaterial = nullptr;
-
-	UPROPERTY()
-	UMaterialInstanceDynamic* FocusPlaneMaterial = nullptr;
-
-	UPROPERTY()
-	UMaterialInterface* ArcPlaneMaterial = nullptr;
-
-protected:
-	
-	const float DefaultAxisLength = 35.0f;
-
-	FVector DirectionToWidget = FVector(0);
-
-public: /* Build Component */
-
-	// Translation
-	void BuildTranslationAxisVerts(TArray<FDynamicMeshVertex>& OutVerts, TArray<uint32>& OutIndices, float CylinderRadius = 1.2f);
-
-	void BuildCylinderVerts(const FVector& Base, const FVector& XAxis, const FVector& YAxis, const FVector& ZAxis, float Radius, float HalfHeight, uint32 Sides, TArray<FDynamicMeshVertex>& OutVerts, TArray<uint32>& OutIndices);
-
-	void BuildConeVerts(float Angle1, float Angle2, float Scale, FVector Offset, uint32 NumSides, TArray<FDynamicMeshVertex>& OutVerts, TArray<uint32>& OutIndices);
-
-	FVector CalcConeVert(float Angle1, float Angle2, float AzimuthAngle);
-
-	void BuildSphereVerts(TArray<FDynamicMeshVertex>& OutVerts, TArray<uint32>& OutIndices);
-
-	void BuildCornerVerts(TArray<FDynamicMeshVertex>& OutVerts, TArray<uint32>& OutIndices);
-
-	void BuildSquareVerts(TArray<FDynamicMeshVertex>& OutVerts, TArray<uint32>& OutIndices);
-
-	// Scale
-	void BuildScaleAxisVerts(TArray<FDynamicMeshVertex>& OutVerts, TArray<uint32>& OutIndices);
-
-	void BuildCubeVerts(float Scale, FVector Offset, TArray<FDynamicMeshVertex>& OutVerts, TArray<uint32>& OutIndices);
-
-	void BuildTriangleVerts(TArray<FDynamicMeshVertex>& OutVerts, TArray<uint32>& OutIndices);
-
-	// Rotation
-	void BuildThickArcVerts(TArray<FDynamicMeshVertex>& OutVerts, TArray<uint32>& OutIndices, const FVector& Axis0, const FVector& Axis1, const float StartAngle, const float EndAngle, float OuterRadius, float InnerRadius, const FColor& Color);
-
-	void BuildStartStopMarkerVerts(TArray<FDynamicMeshVertex>& OutVerts, TArray<uint32>& OutIndices, const FVector& Axis0, const FVector& Axis1, const float Angle, const FColor& Color);
-
-	void BuildSnapMarkerVerts(TArray<FDynamicMeshVertex>& OutVerts, TArray<uint32>& OutIndices, const FVector& Axis0, const FVector& Axis1, const float WidthPercent, const float PercentSize, const FColor& Color);
-
-public: /* Build Widget */
-
-	void TickWidgetComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction *ThisTickFunction);
-
+	void TickWidgetComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction);
 	ULocalPlayer* GetOwnerPlayer() const;
-
 	void RemoveWidgetFromScreen();
-
-protected:
 
 	bool bAddedToScreen = false;
 
-protected: /* Movement */
+	// --------------------------------------------------------
+	// 内部渲染 & 拖拽入口（由 SceneProxy / Tick 调用）
+	// --------------------------------------------------------
+public:
 
-	struct FAbsoluteMovementParams
-	{
-		/** The normal of the plane to project onto */
-		FVector PlaneNormal;
-		/** A vector that represent any displacement we want to mute (remove an axis if we're doing axis movement)*/
-		FVector NormalToRemove;
-		/** The current position of the widget */
-		FVector Position;
+	/** 渲染入口 */
+	void Render(const FSceneView* InView, FPrimitiveDrawInterface* InPDI, FMeshElementCollector& InCollector);
 
-		//Coordinate System Axes
-		FVector XAxis;
-		FVector YAxis;
-		FVector ZAxis;
+	/** 碰撞构建入口 */
+	void BuildCollision(FTriMeshCollisionData& InCollisionData);
 
-		//true if camera movement is locked to the object
-		bool bMovementLockedToCamera;
+	// --------------------------------------------------------
+	// Movement 用公开成员（供 CoordinateAxisMovement.cpp 访问）
+	// --------------------------------------------------------
+public:
 
-		//Direction in world space to the current mouse location
-		FVector PixelDir;
-		//Direction in world space of the middle of the camera
-		FVector CameraDir;
-		FVector EyePos;
+	/** 拖拽平面缓存 */
+	TArray<FDragMovementInfo> DragMovementInfos;
 
-		//whether to snap the requested positionto the grid
-		bool bPositionSnapping;
-	};
+	/** 屏幕空间坐标轴方向 */
+	FVector2D ScreenXAxisDir = FVector2D::ZeroVector;
+	FVector2D ScreenYAxisDir = FVector2D::ZeroVector;
+	FVector2D ScreenZAxisDir = FVector2D::ZeroVector;
+	FVector2D ScreenOrigin   = FVector2D::ZeroVector;
 
-	bool bTranslationInitialOffsetCached;
-	FVector InitialTranslationPosition;
-	FVector InitialTranslationOffset;
-
-	FMatrix CustomCoordSystem = FMatrix::Identity;
-	FVector2D DragStartPos = FVector2D::ZeroVector;
-	FVector2D Origin = FVector2D::ZeroVector;
-	FVector2D XAxisDir = FVector2D::ZeroVector;
-	FVector2D YAxisDir = FVector2D::ZeroVector;
-	FVector2D ZAxisDir = FVector2D::ZeroVector;
-	bool bIsOrthoDrawingFullRing = false;
+	/** 当前帧旋转增量 */
 	float CurrentDeltaRotation = 0.f;
 
-	void GetAxisPlaneNormalAndMask(
-		const FMatrix& InCoordSystem,
-		const FVector& InAxis,
-		const FVector& InDirToPixel,
-		FVector& OutPlaneNormal,
-		FVector& NormalToRemove);
+	/** 自定义坐标系 */
+	FMatrix CustomCoordSystem = FMatrix::Identity;
 
-	void GetPlaneNormalAndMask(
-		const FVector& InAxis,
-		FVector& OutPlaneNormal,
-		FVector& NormalToRemove);
+	/** 平移初始偏移缓存 */
+	bool    bTranslationInitialOffsetCached = false;
+	FVector InitialTranslationPosition      = FVector::ZeroVector;
+	FVector InitialTranslationOffset        = FVector::ZeroVector;
 
-	FVector GetTranslationInitialOffset(
-		const FVector& InNewPosition,
-		const FVector& InCurrentPosition);
+	// --------------------------------------------------------
+	// 私有成员
+	// --------------------------------------------------------
+private:
 
-	FVector GetTranslationDelta(
-		const FAbsoluteMovementParams& InParams);
+	void InitParam();
+	FVector2D GetMousePosition() const;
+	FVector2D GetTouchPosition() const;
+	void CacluMouseDragOffset();
 
-	void ConvertMouseToAxis_Translate(
-		const FMatrix& InputCoordSystem,
-		FAbsoluteMovementParams& InOutParams,
-		FVector& OutDrag);
+	// 状态
+	bool   bDragging      = false;
+	bool   bTouchDragging = false;
+	bool   bRenderVisible = false;
 
-	void ConvertMouseToAxis_Translate(
-		const FSceneView* InView,
-		const FVector2D& InMousePosition,
-		FVector& OutDrag);
+	// 轴选择
+	EAxisType CoordinateFocusAxis  = EAT_None;
+	EAxisType CoordinateRenderAxis = EAT_All;
 
-	void ConvertMouseToAxis_Rotate(
-		FVector2D DragDir,
-		FVector& InOutDelta,
-		FRotator& OutRotation);
+	// 类型与模式
+	ECoorAxisRenderType CoorAxisType = CART_None;
+	ECoordinateAxisMode CoorAxisMode = CAM_Normal;
 
-	void ConvertMouseToAxis_Scale(
-		FVector2D DragDir,
-		FVector& InOutDelta,
-		FVector& OutScale);
+	// 射线检测最大距离
+	float HitDistance = 100000000.f;
 
-	void ConvertMouseMovementToAxisMovement(
-		const FSceneView* InView, 
-		const FVector2D& InMousePosition,
-		FVector& InOutDelta,
-		FVector& OutDrag,
-		FRotator& OutRotation, 
-		FVector& OutScale);
+	// 方向缓存
+	FVector DirectionToWidget = FVector::ZeroVector;
 
-protected:
+	// 帧间运动缓存
+	FVector2D LastMousePos    = FVector2D::ZeroVector;
+	FVector2D CurrentPosition = FVector2D::ZeroVector;
 
-	FVector InMovementDiff = FVector::ZeroVector;
-	FVector OutMovementDrag = FVector::ZeroVector;
+	// 运动输出缓存
+	FVector  InMovementDiff    = FVector::ZeroVector;
+	FVector  OutMovementDrag   = FVector::ZeroVector;
 	FRotator OutMovementRotation = FRotator::ZeroRotator;
-	FVector OutMovementScale = FVector::OneVector;
+	FVector  OutMovementScale  = FVector::OneVector;
+
+	// Controller
+	APlayerController* Controller = nullptr;
+
+	static constexpr float DefaultAxisLength = 35.0f;
 };
+
+// ============================================================
+// SCoordAxisWidgetScreenLayer — 坐标轴标签 Slate 层
+// ============================================================
 
 class SCoordAxisWidgetScreenLayer : public SCompoundWidget
 {
@@ -430,38 +443,27 @@ class SCoordAxisWidgetScreenLayer : public SCompoundWidget
 	SLATE_END_ARGS()
 
 public:
-
 	void Construct(const FArguments& InArgs, const FLocalPlayerContext& InPlayerContext);
 
 	void AddComponent(UCoordinateAxisComponent* InComponent, const FString& InText, const FVector& InLocation, const FLinearColor& InColor);
-
 	void RemoveComponent(UCoordinateAxisComponent* InComponent);
 
 	virtual void Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime) override;
 
 private:
-
-	FVector2D Pivot = FVector2D(0.5f, 0.5f);
+	FVector2D Pivot    = FVector2D(0.5f, 0.5f);
 	FVector2D DrawSize = FVector2D(32.f, 32.f);
 
-	class FComponentData
+	struct FComponentData
 	{
-	public:
-
 		TWeakObjectPtr<UCoordinateAxisComponent> Component;
-
-		TArray<SConstraintCanvas::FSlot*> Slots;
-		TArray<TSharedPtr<SWidget>> Widgets;
-		TArray<FVector> SlotLocation;
+		TArray<SConstraintCanvas::FSlot*>        Slots;
+		TArray<TSharedPtr<SWidget>>              Widgets;
+		TArray<FVector>                          SlotLocation;
 	};
 
 	TMap<UCoordinateAxisComponent*, FComponentData> ComponentMap;
-
-	FSlateFontInfo FontInfo;
-
-private:
-
-	FLocalPlayerContext PlayerContext;
-
-	TSharedPtr<SConstraintCanvas> Canvas;
+	FSlateFontInfo                                   FontInfo;
+	FLocalPlayerContext                              PlayerContext;
+	TSharedPtr<SConstraintCanvas>                    Canvas;
 };

@@ -26,7 +26,8 @@ public class CoordinateAxis : ModuleRules
 			new string[]
 			{
 				"Core",
-				// ... add other public dependencies that you statically link with here ...
+				"RenderCore",
+				"RHI",
 			}
 			);
 			
@@ -38,7 +39,9 @@ public class CoordinateAxis : ModuleRules
 				"Engine",
 				"Slate",
 				"SlateCore",
-				// ... add private dependencies that you statically link with here ...	
+				"InputCore",
+				"PhysicsCore",
+				"UMG",
 			}
 			);
 		
