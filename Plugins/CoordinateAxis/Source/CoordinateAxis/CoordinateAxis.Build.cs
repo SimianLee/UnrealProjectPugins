@@ -26,8 +26,6 @@ public class CoordinateAxis : ModuleRules
 			new string[]
 			{
 				"Core",
-				"RenderCore",
-				"RHI",
 			}
 			);
 			
@@ -37,6 +35,8 @@ public class CoordinateAxis : ModuleRules
 			{
 				"CoreUObject",
 				"Engine",
+				"RenderCore",
+				"RHI",
 				"Slate",
 				"SlateCore",
 				"InputCore",
